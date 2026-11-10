@@ -218,3 +218,7 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Project data
+sandag_collisions_full.csv
+!sandag_collisions_full.csv.gz

@@ -1,0 +1,7 @@
+duckdb==1.4.2
+mcp[cli]==1.30.0
+openai-agents==0.24.0
+pandas==2.3.3
+pyarrow==22.0.0
+pytest==9.0.1
+streamlit==1.67.0
