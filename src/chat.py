@@ -61,7 +61,7 @@ def stop_ollama(runtime):
         try:
             ollama_request(
                 "/api/generate",
-                {"model": OLLAMA_MODEL, "prompt": "", "keep_alive": 0},
+                {"model": runtime["model"], "prompt": "", "keep_alive": 0},
                 timeout=30,
             )
         except (OSError, URLError):
@@ -76,8 +76,7 @@ def stop_ollama(runtime):
             process.kill()
 
 
-@st.cache_resource
-def start_ollama():
+def ensure_ollama(model_name=OLLAMA_MODEL):
     process = None
     if not ollama_is_running():
         executable = shutil.which("ollama")
@@ -105,18 +104,18 @@ def start_ollama():
         installed = {
             model["name"] for model in ollama_request("/api/tags").get("models", [])
         }
-        if OLLAMA_MODEL not in installed:
+        if model_name not in installed:
             raise RuntimeError(
-                f"Model {OLLAMA_MODEL} is not installed. Run: "
-                f"ollama pull {OLLAMA_MODEL}"
+                f"Model {model_name} is not installed. Run: "
+                f"ollama pull {model_name}"
             )
         loaded = {
             model["name"] for model in ollama_request("/api/ps").get("models", [])
         }
-        unload_model = OLLAMA_MODEL not in loaded
+        unload_model = model_name not in loaded
         ollama_request(
             "/api/generate",
-            {"model": OLLAMA_MODEL, "prompt": "", "keep_alive": -1},
+            {"model": model_name, "prompt": "", "keep_alive": -1},
             timeout=120,
         )
     except Exception:
@@ -124,9 +123,38 @@ def start_ollama():
             process.terminate()
         raise
 
-    runtime = {"process": process, "unload_model": unload_model}
+    runtime = {
+        "process": process,
+        "unload_model": unload_model,
+        "model": model_name,
+    }
     atexit.register(stop_ollama, runtime)
     return runtime
+
+
+@st.cache_resource
+def start_ollama():
+    return ensure_ollama()
+
+
+def create_agent(model_name, local_client, server, model_settings=None):
+    model = OpenAIChatCompletionsModel(
+        model=model_name,
+        openai_client=local_client,
+    )
+    return Agent(
+        name="Collision Analytics Assistant",
+        instructions=AGENT_INSTRUCTIONS,
+        model=model,
+        model_settings=model_settings,
+        mcp_servers=[server],
+        mcp_config={"convert_schemas_to_strict": True},
+    )
+
+
+async def run_agent(agent, question, conversation=None, hooks=None):
+    agent_input = (conversation or []) + [{"role": "user", "content": question}]
+    return await Runner.run(agent, agent_input, max_turns=4, hooks=hooks)
 
 
 async def ask_agent(question, conversation):
@@ -138,73 +166,67 @@ async def ask_agent(question, conversation):
     async with AsyncOpenAI(
         base_url=f"{OLLAMA_URL}/v1", api_key="ollama"
     ) as local_client:
-        model = OpenAIChatCompletionsModel(
-            model=OLLAMA_MODEL,
-            openai_client=local_client,
-        )
         async with MCPServerStdio(
             name="Collision Analytics",
             params=server_params,
             cache_tools_list=True,
             client_session_timeout_seconds=30,
         ) as server:
-            agent = Agent(
-                name="Collision Analytics Assistant",
-                instructions=AGENT_INSTRUCTIONS,
-                model=model,
-                mcp_servers=[server],
-                mcp_config={"convert_schemas_to_strict": True},
-            )
-            agent_input = conversation + [{"role": "user", "content": question}]
-            result = await Runner.run(agent, agent_input, max_turns=4)
+            agent = create_agent(OLLAMA_MODEL, local_client, server)
+            result = await run_agent(agent, question, conversation)
             return result.final_output, result.to_input_list()
 
 
-st.set_page_config(page_title="Collision Analytics Chat", page_icon="🚗")
-st.title("Collision Analytics Chat")
-st.caption(
-    f"Local model: {OLLAMA_MODEL}. Ask about totals, trends, severity, or hotspots."
-)
+def main():
+    st.set_page_config(page_title="Collision Analytics Chat", page_icon="🚗")
+    st.title("Collision Analytics Chat")
+    st.caption(
+        f"Local model: {OLLAMA_MODEL}. Ask about totals, trends, severity, or hotspots."
+    )
 
-set_tracing_disabled(True)
+    set_tracing_disabled(True)
 
-try:
-    with st.spinner(f"Starting {OLLAMA_MODEL}..."):
-        start_ollama()
-except Exception as error:
-    st.error(str(error))
-    st.code(f"ollama pull {OLLAMA_MODEL}")
-    st.stop()
+    try:
+        with st.spinner(f"Starting {OLLAMA_MODEL}..."):
+            start_ollama()
+    except Exception as error:
+        st.error(str(error))
+        st.code(f"ollama pull {OLLAMA_MODEL}")
+        st.stop()
 
-if "messages" not in st.session_state:
-    st.session_state.messages = []
-if "agent_input" not in st.session_state:
-    st.session_state.agent_input = []
+    if "messages" not in st.session_state:
+        st.session_state.messages = []
+    if "agent_input" not in st.session_state:
+        st.session_state.agent_input = []
 
-if st.sidebar.button("Clear conversation"):
-    st.session_state.messages = []
-    st.session_state.agent_input = []
-    st.rerun()
+    if st.sidebar.button("Clear conversation"):
+        st.session_state.messages = []
+        st.session_state.agent_input = []
+        st.rerun()
 
-for message in st.session_state.messages:
-    with st.chat_message(message["role"]):
-        st.markdown(message["content"])
+    for message in st.session_state.messages:
+        with st.chat_message(message["role"]):
+            st.markdown(message["content"])
 
-if question := st.chat_input("Ask a collision analytics question"):
-    st.session_state.messages.append({"role": "user", "content": question})
-    with st.chat_message("user"):
-        st.markdown(question)
+    if question := st.chat_input("Ask a collision analytics question"):
+        st.session_state.messages.append({"role": "user", "content": question})
+        with st.chat_message("user"):
+            st.markdown(question)
 
-    with st.chat_message("assistant"):
-        with st.spinner("Analyzing collisions..."):
-            try:
-                answer, conversation = asyncio.run(
-                    ask_agent(question, st.session_state.agent_input)
-                )
-                st.markdown(answer)
-                st.session_state.agent_input = conversation
-                st.session_state.messages.append(
-                    {"role": "assistant", "content": answer}
-                )
-            except Exception as error:
-                st.error(f"Unable to complete the request: {error}")
+        with st.chat_message("assistant"):
+            with st.spinner("Analyzing collisions..."):
+                try:
+                    answer, conversation = asyncio.run(
+                        ask_agent(question, st.session_state.agent_input)
+                    )
+                    st.markdown(answer)
+                    st.session_state.agent_input = conversation
+                    st.session_state.messages.append(
+                        {"role": "assistant", "content": answer}
+                    )
+                except Exception as error:
+                    st.error(f"Unable to complete the request: {error}")
+
+
+if __name__ == "__main__":
+    main()

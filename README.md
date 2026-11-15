@@ -115,6 +115,20 @@ To use another installed model, set `OLLAMA_MODEL` before launch:
 OLLAMA_MODEL=qwen3:1.7b streamlit run src/chat.py
 ```
 
+## Evaluate MCP chat accuracy and latency
+
+Run the warmed-up MCP evaluation from the project root:
+
+```bash
+.venv/bin/python tests/evaluate_mcp_performance.py
+```
+
+The script starts one persistent MCP server, completes an unmeasured warm-up,
+and then runs 10 representative questions five times each using only
+`qwen3:4b-q4_K_M`. Results are written to
+`evaluation/mcp_performance_results.csv` and
+`evaluation/mcp_performance_report.md`.
+
 Query the existing database:
 
 ```python
