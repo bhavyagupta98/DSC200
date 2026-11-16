@@ -13,6 +13,7 @@ CATEGORICAL_FILTERS = {
     "collision_type": "type_of_collision",
     "weekday": "collision_weekday",
     "location": "location_sandag",
+    "highway_type": "state_hwy_ind",
 }
 
 BOOLEAN_FILTERS = {
@@ -43,6 +44,7 @@ FILTER_ORDER = [
     "end_date",
     "start_year",
     "end_year",
+    "highway_type",
     "severity",
     "weather",
     "collision_type",

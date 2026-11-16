@@ -6,7 +6,8 @@ from src.analytics import (
     summary_statistics,
     temporal_trends,
     severity_distribution,
-    geographic_hotspots
+    geographic_hotspots,
+    filter_options
 )
 
 st.set_page_config(
@@ -21,6 +22,8 @@ st.write("Explore historical SANDAG collision data from 2014–2023.")
 # Sidebar filters
 st.sidebar.header("Filters")
 
+options = filter_options()
+
 year_range = st.sidebar.slider(
     "Select years",
     min_value=2014,
@@ -28,10 +31,46 @@ year_range = st.sidebar.slider(
     value=(2014, 2023)
 )
 
+st.sidebar.subheader("Road Type")
+
+state_hwy = st.sidebar.checkbox("State Highway", value=True)
+not_state_hwy = st.sidebar.checkbox("Not State Highway", value=True)
+not_stated = st.sidebar.checkbox("Unstated Road Type", value=True)
+
+
+st.sidebar.subheader("Locality")
+
+region_options = ["All Cities"] + options["location"]
+
+selected_region = st.sidebar.selectbox(
+    "Specific city, town, or reservation in the San Diego area.",
+    options=region_options
+)
+
+
 filters = {
     "start_year": year_range[0],
-    "end_year": year_range[1]
+    "end_year": year_range[1],
+    "highway_type": [
+        value for value, selected in [
+            ("State Highway", state_hwy),
+            ("Not State Highway", not_state_hwy),
+            ("Not Stated", not_stated)
+        ]
+        if selected
+    ],
 }
+
+if selected_region != "All Cities":
+    filters["location"] = [selected_region]
+
+
+# Error catching
+if not filters["highway_type"]:
+    st.warning("Please select at least one road type.")
+    st.stop()
+
+
 
 # Summary statistics
 summary = summary_statistics(filters)
@@ -55,6 +94,8 @@ if not yearly_df.empty:
 
 # Hourly collisions
 st.header("Collisions by Hour")
+
+st.write("Labels are chronological, such that 0 corresponds to 12 A.M. and 23 corresponds to 11 P.M.")
 
 hourly_data = temporal_trends("hour", filters)
 hourly_df = pd.DataFrame(hourly_data)

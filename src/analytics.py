@@ -11,6 +11,7 @@ GROUPINGS = {
     "severity": ("severity_normalized", "severity"),
     "weather": ("weather_1", "weather"),
     "collision_type": ("type_of_collision", "collision_type"),
+    "hwy": ("state_hwy_ind", "hwy"),
 }
 
 TEMPORAL_PERIODS = {"year", "month", "weekday", "hour"}
