@@ -32,6 +32,8 @@ def database_path(tmp_path):
             weather_1 VARCHAR,
             type_of_collision VARCHAR,
             location_sandag VARCHAR,
+            state_hwy_ind VARCHAR,
+            pcf_viol_category VARCHAR,
             pedestrian_accident BOOLEAN,
             bicycle_accident BOOLEAN,
             motorcycle_accident BOOLEAN,
@@ -46,15 +48,15 @@ def database_path(tmp_path):
         """
     )
     rows = [
-        (date(2020, 1, 1), 2020, 1, "Wednesday", 8, "Fatal", "Clear", "Rear End", "San Diego", True, False, False, False, True, 32.701, -117.101, 1, 2, "duplicate"),
-        (date(2020, 1, 2), 2020, 1, "Thursday", None, "Property Damage Only", "Cloudy", "Hit Object", "San Diego", False, False, False, False, False, 32.702, -117.102, 0, 0, "duplicate"),
-        (date(2021, 6, 10), 2021, 6, "Thursday", 17, "Injury (Severe)", "Clear", "Rear End", "Chula Vista", False, False, True, False, False, 32.751, -117.051, 0, 3, "case-3"),
-        (date(2021, 6, 11), 2021, 6, "Friday", 17, "Injury (Complaint of Pain)", None, "Vehicle/Pedestrian", None, True, False, False, False, False, None, None, 0, 1, "case-4"),
-        (date(2022, 12, 3), 2022, 12, "Saturday", 22, "Property Damage Only", "Not Stated", "None", "Unincorporated", False, False, False, True, False, 32.801, -117.201, 0, 0, "case-5"),
-        (date(2023, 7, 4), 2023, 7, "Tuesday", 21, "Fatal", "Raining", "Head-On", "San Diego", False, False, False, False, False, 32.901, -117.301, 2, 1, "case-6"),
+        (date(2020, 1, 1), 2020, 1, "Wednesday", 8, "Fatal", "Clear", "Rear End", "San Diego", "State Highway", "Unsafe Speed", True, False, False, False, True, 32.701, -117.101, 1, 2, "duplicate"),
+        (date(2020, 1, 2), 2020, 1, "Thursday", None, "Property Damage Only", "Cloudy", "Hit Object", "San Diego", "Not State Highway", "Improper Turning", False, False, False, False, False, 32.702, -117.102, 0, 0, "duplicate"),
+        (date(2021, 6, 10), 2021, 6, "Thursday", 17, "Injury (Severe)", "Clear", "Rear End", "Chula Vista", "State Highway", "Unsafe Speed", False, False, True, False, False, 32.751, -117.051, 0, 3, "case-3"),
+        (date(2021, 6, 11), 2021, 6, "Friday", 17, "Injury (Complaint of Pain)", None, "Vehicle/Pedestrian", None, "Not Stated", None, True, False, False, False, False, None, None, 0, 1, "case-4"),
+        (date(2022, 12, 3), 2022, 12, "Saturday", 22, "Property Damage Only", "Not Stated", "None", "Unincorporated", "Not State Highway", "Not Stated", False, False, False, True, False, 32.801, -117.201, 0, 0, "case-5"),
+        (date(2023, 7, 4), 2023, 7, "Tuesday", 21, "Fatal", "Raining", "Head-On", "San Diego", "State Highway", "Driving Under Influence", False, False, False, False, False, 32.901, -117.301, 2, 1, "case-6"),
     ]
     connection.executemany(
-        "INSERT INTO collisions VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "INSERT INTO collisions VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         rows,
     )
     connection.close()
@@ -146,6 +148,12 @@ def test_boolean_location_and_bounding_box_filters(database_path):
         },
         db_path=database_path,
     )["total_collisions"] == 2
+    assert analytics.summary_statistics(
+        {"highway_type": "State Highway"}, db_path=database_path
+    )["total_collisions"] == 3
+    assert analytics.summary_statistics(
+        {"pcf": "Unsafe Speed"}, db_path=database_path
+    )["total_collisions"] == 2
 
 
 def test_generic_grouping_and_temporal_trends(database_path):
@@ -182,6 +190,23 @@ def test_generic_grouping_and_temporal_trends(database_path):
     hourly = analytics.temporal_trends("hour", db_path=database_path)
     assert sum(item["collision_count"] for item in hourly) == 5
     assert all(item["hour"] is not None for item in hourly)
+
+    highway_counts = {
+        item["hwy"]: item["collision_count"]
+        for item in analytics.aggregate_collisions("hwy", db_path=database_path)
+    }
+    assert highway_counts == {
+        "Not State Highway": 2,
+        "Not Stated": 1,
+        "State Highway": 3,
+    }
+
+    pcf_counts = {
+        item["pcf"]: item["collision_count"]
+        for item in analytics.aggregate_collisions("pcf", db_path=database_path)
+    }
+    assert pcf_counts["Unsafe Speed"] == 2
+    assert None not in pcf_counts
 
     with pytest.raises(ValueError, match="Unsupported group_by"):
         analytics.aggregate_collisions("primary_rd", db_path=database_path)
@@ -249,6 +274,8 @@ def test_filter_options_preserve_valid_categories_and_exclude_null(database_path
     assert None not in options["weather"]
     assert "None" in options["collision_type"]
     assert None not in options["location"]
+    assert "Unsafe Speed" in options["pcf"]
+    assert None not in options["pcf"]
     assert options["severity"] == sorted(options["severity"])
 
 
