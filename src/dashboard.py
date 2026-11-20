@@ -1,13 +1,14 @@
 import argparse
 
-import streamlit as st
 import pandas as pd
+import streamlit as st
 
 from src.analytics import (
+    filter_options,
+    geographic_hotspots,
+    severity_distribution,
     summary_statistics,
     temporal_trends,
-    severity_distribution,
-    geographic_hotspots,
 )
 
 
@@ -16,6 +17,8 @@ def render_dashboard():
     st.write("Explore historical SANDAG collision data from 2014–2023.")
 
     st.sidebar.header("Filters")
+    options = filter_options()
+
     year_range = st.sidebar.slider(
         "Select years",
         min_value=2014,
@@ -23,12 +26,53 @@ def render_dashboard():
         value=(2014, 2023),
     )
 
+    st.sidebar.subheader("Road Type")
+    state_hwy = st.sidebar.checkbox("State Highway", value=True)
+    not_state_hwy = st.sidebar.checkbox("Not State Highway", value=True)
+    not_stated = st.sidebar.checkbox("Unstated Road Type", value=True)
+
+    st.sidebar.subheader("Locality")
+    selected_region = st.sidebar.selectbox(
+        "Specific city, town, or reservation in the San Diego area.",
+        options=["All Cities"] + options["location"],
+    )
+
+    st.sidebar.subheader("Collision Factors")
+    selected_pcf = st.sidebar.selectbox(
+        "Main contributor to collision.",
+        options=["All Factors"] + options["pcf"],
+    )
+
     filters = {
         "start_year": year_range[0],
         "end_year": year_range[1],
+        "highway_type": [
+            value
+            for value, selected in [
+                ("State Highway", state_hwy),
+                ("Not State Highway", not_state_hwy),
+                ("Not Stated", not_stated),
+            ]
+            if selected
+        ],
     }
+    if selected_region != "All Cities":
+        filters["location"] = [selected_region]
+    if selected_pcf != "All Factors":
+        filters["pcf"] = [selected_pcf]
+
+    if not filters["highway_type"]:
+        st.warning("Please select at least one road type.")
+        st.stop()
 
     summary = summary_statistics(filters)
+    if summary["total_collisions"] == 0:
+        st.warning(
+            "There are no documented collisions with this set of filters. "
+            "To resolve this, input a different combination in the sidebar."
+        )
+        st.stop()
+
     col1, col2, col3 = st.columns(3)
     col1.metric("Total Collisions", f"{summary['total_collisions']:,}")
     col2.metric("Fatalities", f"{summary['total_fatalities']:,}")
@@ -40,6 +84,10 @@ def render_dashboard():
         st.line_chart(yearly_df.set_index("year")["collision_count"])
 
     st.header("Collisions by Hour")
+    st.write(
+        "Labels are chronological, such that 0 corresponds to 12 A.M. "
+        "and 23 corresponds to 11 P.M."
+    )
     hourly_df = pd.DataFrame(temporal_trends("hour", filters))
     if not hourly_df.empty:
         st.bar_chart(hourly_df.set_index("hour")["collision_count"])
