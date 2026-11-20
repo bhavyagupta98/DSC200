@@ -67,6 +67,18 @@ def severity_distribution(filters=None, db_path=None):
     return aggregate_collisions("severity", filters, db_path)
 
 
+def collision_type_distribution(filters=None, limit=5, db_path=None):
+    if isinstance(limit, bool) or not isinstance(limit, int) or limit <= 0:
+        raise ValueError("limit must be a positive integer")
+
+    rows = aggregate_collisions("collision_type", filters, db_path)
+    ranked = sorted(
+        rows,
+        key=lambda row: (-row["collision_count"], row["collision_type"]),
+    )
+    return ranked[:limit]
+
+
 def geographic_hotspots(filters=None, grid_size=0.01, limit=10, db_path=None):
     if (
         isinstance(grid_size, bool)
