@@ -14,6 +14,7 @@ CATEGORICAL_FILTERS = {
     "weekday": "collision_weekday",
     "location": "location_sandag",
     "highway_type": "state_hwy_ind",
+    "pcf": "pcf_viol_category",
 }
 
 BOOLEAN_FILTERS = {
@@ -50,6 +51,7 @@ FILTER_ORDER = [
     "collision_type",
     "weekday",
     "location",
+    "pcf",
     "pedestrian_accident",
     "bicycle_accident",
     "motorcycle_accident",

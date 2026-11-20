@@ -48,6 +48,16 @@ selected_region = st.sidebar.selectbox(
 )
 
 
+st.sidebar.subheader("Collision Factors")
+
+pcf_options = ["All Factors"] + options["pcf"]
+
+selected_pcf = st.sidebar.selectbox(
+    "Main contributor to collision.",
+    options=pcf_options
+)
+
+
 filters = {
     "start_year": year_range[0],
     "end_year": year_range[1],
@@ -63,6 +73,8 @@ filters = {
 
 if selected_region != "All Cities":
     filters["location"] = [selected_region]
+if selected_pcf != "All Factors":
+    filters["pcf"] = [selected_pcf]
 
 
 # Error catching
@@ -74,6 +86,11 @@ if not filters["highway_type"]:
 
 # Summary statistics
 summary = summary_statistics(filters)
+
+if summary['total_collisions'] == 0:
+    st.warning("There are no documented collisions with this set of filters. "\
+               "To resolve this, input a different combination in the sidebar.")
+    st.stop()
 
 col1, col2, col3 = st.columns(3)
 

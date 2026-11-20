@@ -12,6 +12,7 @@ GROUPINGS = {
     "weather": ("weather_1", "weather"),
     "collision_type": ("type_of_collision", "collision_type"),
     "hwy": ("state_hwy_ind", "hwy"),
+    "pcf": ("pcf_viol_category", "pcf"),
 }
 
 TEMPORAL_PERIODS = {"year", "month", "weekday", "hour"}
@@ -22,6 +23,7 @@ FILTER_OPTION_COLUMNS = {
     "collision_type": "type_of_collision",
     "weekday": "collision_weekday",
     "location": "location_sandag",
+    "pcf": "pcf_viol_category",
 }
 
 
