@@ -6,6 +6,7 @@ import pytest
 from src import analytics
 from src.db import build_where_clause
 from src.mcp_server import (
+    get_collision_type_distribution,
     get_filter_options,
     get_geographic_hotspots,
     get_severity_distribution,
@@ -196,6 +197,29 @@ def test_severity_distribution_reuses_generic_aggregation(database_path):
     assert counts == {"Fatal": 1, "Property Damage Only": 1}
 
 
+def test_collision_type_distribution_ranks_and_limits_results(database_path):
+    result = analytics.collision_type_distribution(limit=2, db_path=database_path)
+    assert [(item["collision_type"], item["collision_count"]) for item in result] == [
+        ("Rear End", 2),
+        ("Head-On", 1),
+    ]
+
+    result_2020 = analytics.collision_type_distribution(
+        {"start_year": 2020, "end_year": 2020},
+        limit=5,
+        db_path=database_path,
+    )
+    assert {item["collision_type"]: item["collision_count"] for item in result_2020} == {
+        "Hit Object": 1,
+        "Rear End": 1,
+    }
+
+    with pytest.raises(ValueError, match="limit must be"):
+        analytics.collision_type_distribution(limit=0, db_path=database_path)
+    with pytest.raises(ValueError, match="limit must be"):
+        analytics.collision_type_distribution(limit=True, db_path=database_path)
+
+
 def test_hotspots_exclude_missing_coordinates_and_rank_cells(database_path):
     result = analytics.geographic_hotspots(
         grid_size=0.01, limit=2, db_path=database_path
@@ -254,6 +278,9 @@ def test_mcp_tools_delegate_to_shared_analytics(database_path, monkeypatch):
     assert get_severity_distribution(filters) == analytics.severity_distribution(
         filters
     )
+    assert get_collision_type_distribution(
+        filters, 3
+    ) == analytics.collision_type_distribution(filters, 3)
     assert get_geographic_hotspots(filters, 0.01, 5) == analytics.geographic_hotspots(
         filters, 0.01, 5
     )
@@ -264,6 +291,7 @@ def test_mcp_tools_delegate_to_shared_analytics(database_path, monkeypatch):
         "get_summary_statistics",
         "get_temporal_trends",
         "get_severity_distribution",
+        "get_collision_type_distribution",
         "get_geographic_hotspots",
         "get_filter_options",
     }

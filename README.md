@@ -24,7 +24,7 @@ Run the one-time ingestion:
 ```
 
 This creates `data/processed/collisions.parquet`, `data/collisions.duckdb`, and
-`DATA_QUALITY_REPORT.md`. Rerunning the command atomically replaces the table
+`eda.md`. Rerunning the command atomically replaces the table
 instead of appending duplicate records.
 
 ## Restore the raw CSV and rebuild
@@ -79,10 +79,14 @@ Linux, run:
 Streamlit prints a local URL, normally `http://localhost:8501`, and may open it
 automatically in a browser. Stop the dashboard with `Ctrl+C` in the terminal.
 
-## Run the collision analytics chat
+Without `--chat`, the command continues to show only the analytics dashboard
+and does not start Ollama.
+
+## Enable the collision analytics chat page
 
 The chat uses Streamlit, the OpenAI Agents SDK, the existing MCP server, and a
-local Ollama model. It does not require an OpenAI API key.
+local Ollama model. It runs as a second page inside the dashboard and does not
+require an OpenAI API key.
 
 Install Ollama and download the quantized 4B model once:
 
@@ -91,16 +95,10 @@ brew install ollama
 ollama pull qwen3:4b-q4_K_M
 ```
 
-Then launch the app from the project root:
+Then launch the dashboard with the chat page enabled:
 
 ```bash
-.venv/bin/streamlit run src/chat.py
-```
-
-If the virtual environment is already active, the equivalent command is:
-
-```bash
-streamlit run src/chat.py
+.venv/bin/python -m streamlit run src/dashboard.py -- --chat
 ```
 
 The app starts `ollama serve` when no server is already available, preloads the
@@ -112,7 +110,7 @@ cleanup.
 To use another installed model, set `OLLAMA_MODEL` before launch:
 
 ```bash
-OLLAMA_MODEL=qwen3:1.7b streamlit run src/chat.py
+OLLAMA_MODEL=qwen3:1.7b .venv/bin/python -m streamlit run src/dashboard.py -- --chat
 ```
 
 Query the existing database:
@@ -165,6 +163,12 @@ The dashboard should open in a browser. If it does not, open
 dashboard, and press `Ctrl+C` there to stop it.
 
 The dashboard does not require Ollama, MCP, a GPU, or an API key.
+
+To include the local-model chat as a second page, use:
+
+```powershell
+.venv\Scripts\python.exe -m streamlit run src\dashboard.py -- --chat
+```
 
 ### 4. Run queries using the existing analytics functions
 
@@ -251,6 +255,11 @@ pprint(analytics.temporal_trends("year", {"start_year": 2020, "end_year": 2023})
 # Show the severity breakdown for 2023
 pprint(analytics.severity_distribution({"start_year": 2023, "end_year": 2023}))
 
+# Show the five most common collision types for 2023
+pprint(analytics.collision_type_distribution(
+    {"start_year": 2023, "end_year": 2023}, limit=5
+))
+
 # Show the ten busiest geographic grid areas for 2023
 pprint(analytics.geographic_hotspots({"start_year": 2023, "end_year": 2023}, limit=10))
 
@@ -291,13 +300,13 @@ MCP uses the included database and does not require Ollama or an API key.
 Always use `-m src.mcp_server`. Do not run `python src\mcp_server.py`; that can
 cause `ModuleNotFoundError: No module named 'src'`.
 
-### Optional chat
+### Optional chat page
 
 The chat requires Ollama for Windows and the local model:
 
 ```powershell
 ollama pull qwen3:4b-q4_K_M
-.venv\Scripts\python.exe -m streamlit run src\chat.py
+.venv\Scripts\python.exe -m streamlit run src\dashboard.py -- --chat
 ```
 
 ### Windows troubleshooting

@@ -30,10 +30,12 @@ single year, use get_summary_statistics. Every filter must be nested inside the
 tool's filters argument; never pass a filter at the top level. For example, a
 2020 query uses filters={"start_year": 2020, "end_year": 2020}. Use normalized
 severity "Fatal" for fatal-collision filters and alcohol_involved=true for
-alcohol questions. For hotspots, always use get_geographic_hotspots with
-grid_size=0.01 and the requested limit unless the user explicitly specifies
-another grid size. Explain that hotspots show historical collision frequency,
-not risk. Keep answers concise and include the relevant numbers.
+alcohol questions. For collision-type rankings or breakdowns, use
+get_collision_type_distribution with the requested limit. For hotspots, always
+use get_geographic_hotspots with grid_size=0.01 and the requested limit unless
+the user explicitly specifies another grid size. Explain that hotspots show
+historical collision frequency, not risk. Keep answers concise and include the
+relevant numbers.
 """
 
 
@@ -160,51 +162,52 @@ async def ask_agent(question, conversation):
             return result.final_output, result.to_input_list()
 
 
-st.set_page_config(page_title="Collision Analytics Chat", page_icon="🚗")
-st.title("Collision Analytics Chat")
-st.caption(
-    f"Local model: {OLLAMA_MODEL}. Ask about totals, trends, severity, or hotspots."
-)
+def render_chat():
+    st.title("Collision Analytics Chat")
+    st.caption(
+        f"Local model: {OLLAMA_MODEL}. "
+        "Ask about totals, trends, severity, or hotspots."
+    )
 
-set_tracing_disabled(True)
+    set_tracing_disabled(True)
 
-try:
-    with st.spinner(f"Starting {OLLAMA_MODEL}..."):
-        start_ollama()
-except Exception as error:
-    st.error(str(error))
-    st.code(f"ollama pull {OLLAMA_MODEL}")
-    st.stop()
+    try:
+        with st.spinner(f"Starting {OLLAMA_MODEL}..."):
+            start_ollama()
+    except Exception as error:
+        st.error(str(error))
+        st.code(f"ollama pull {OLLAMA_MODEL}")
+        st.stop()
 
-if "messages" not in st.session_state:
-    st.session_state.messages = []
-if "agent_input" not in st.session_state:
-    st.session_state.agent_input = []
+    if "messages" not in st.session_state:
+        st.session_state.messages = []
+    if "agent_input" not in st.session_state:
+        st.session_state.agent_input = []
 
-if st.sidebar.button("Clear conversation"):
-    st.session_state.messages = []
-    st.session_state.agent_input = []
-    st.rerun()
+    if st.sidebar.button("Clear conversation"):
+        st.session_state.messages = []
+        st.session_state.agent_input = []
+        st.rerun()
 
-for message in st.session_state.messages:
-    with st.chat_message(message["role"]):
-        st.markdown(message["content"])
+    for message in st.session_state.messages:
+        with st.chat_message(message["role"]):
+            st.markdown(message["content"])
 
-if question := st.chat_input("Ask a collision analytics question"):
-    st.session_state.messages.append({"role": "user", "content": question})
-    with st.chat_message("user"):
-        st.markdown(question)
+    if question := st.chat_input("Ask a collision analytics question"):
+        st.session_state.messages.append({"role": "user", "content": question})
+        with st.chat_message("user"):
+            st.markdown(question)
 
-    with st.chat_message("assistant"):
-        with st.spinner("Analyzing collisions..."):
-            try:
-                answer, conversation = asyncio.run(
-                    ask_agent(question, st.session_state.agent_input)
-                )
-                st.markdown(answer)
-                st.session_state.agent_input = conversation
-                st.session_state.messages.append(
-                    {"role": "assistant", "content": answer}
-                )
-            except Exception as error:
-                st.error(f"Unable to complete the request: {error}")
+        with st.chat_message("assistant"):
+            with st.spinner("Analyzing collisions..."):
+                try:
+                    answer, conversation = asyncio.run(
+                        ask_agent(question, st.session_state.agent_input)
+                    )
+                    st.markdown(answer)
+                    st.session_state.agent_input = conversation
+                    st.session_state.messages.append(
+                        {"role": "assistant", "content": answer}
+                    )
+                except Exception as error:
+                    st.error(f"Unable to complete the request: {error}")

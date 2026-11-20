@@ -29,6 +29,15 @@ def get_severity_distribution(filters: dict[str, Any] | None = None) -> list[dic
 
 
 @mcp.tool()
+def get_collision_type_distribution(
+    filters: dict[str, Any] | None = None,
+    limit: int = 5,
+) -> list[dict]:
+    """Rank collision types by collision count for the selected filters."""
+    return analytics.collision_type_distribution(filters, limit)
+
+
+@mcp.tool()
 def get_geographic_hotspots(
     filters: dict[str, Any] | None = None,
     grid_size: float = 0.01,
