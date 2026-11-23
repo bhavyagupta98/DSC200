@@ -23,8 +23,8 @@ Run the one-time ingestion:
 .venv/bin/python collision_pipeline.py
 ```
 
-This creates `data/processed/collisions.parquet`, `data/collisions.duckdb`, and
-`eda.md`. Rerunning the command atomically replaces the table
+This creates `data/processed/collisions.parquet` and
+`data/collisions.duckdb`. Rerunning the command atomically replaces the table
 instead of appending duplicate records.
 
 ## Restore the raw CSV and rebuild
