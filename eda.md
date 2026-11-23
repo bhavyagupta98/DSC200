@@ -29,7 +29,7 @@
 
 ## Functional files
 
-- `collision_pipeline.py` cleans, validates, and writes the source data to Parquet, DuckDB, and this EDA report.
+- `collision_pipeline.py` cleans, validates, and writes the source data to Parquet and DuckDB.
 - `src/db.py` validates filters, builds parameterized SQL, and opens DuckDB in read-only mode.
 - `src/analytics.py` provides totals, trends, severity, ranked collision types, filter options, and geographic hotspots.
 - `src/mcp_server.py` exposes the shared analytics functions as MCP tools without allowing arbitrary SQL or writes.

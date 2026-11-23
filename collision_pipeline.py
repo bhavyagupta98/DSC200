@@ -408,72 +408,7 @@ def validate_database(database_path, expected_rows):
         connection.close()
 
 
-def write_eda_report(cleaned, database_results, report_path):
-    important_columns = [
-        "collision_time",
-        "distance",
-        "state_route",
-        "postmile",
-        "control_device",
-        "stwd_vehtype_at_fault",
-        "location_sandag",
-        "reservation_sandag",
-    ]
-    missing = cleaned[important_columns].isna().sum()
-    severity = cleaned["severity_normalized"].value_counts()
-    missing_text = ", ".join(
-        f"`{column}` ({int(count):,})" for column, count in missing.items()
-    )
-    severity_text = ", ".join(
-        f"{label} ({int(count):,})" for label, count in severity.items()
-    )
-    report = f"""# Collision Data EDA
-
-## Summary
-
-- {database_results['row_count']:,} collision records covering {database_results['year_min']}–{database_results['year_max']} were retained.
-- The source has {len(ORIGINAL_COLUMNS)} columns; {len(DERIVED_COLUMNS)} analytical columns were added.
-- The dataset records {database_results['number_killed']:,} fatalities and {database_results['number_injured']:,} injuries.
-- The cleaned data is stored in `data/processed/collisions.parquet` and `data/collisions.duckdb`.
-
-## Main observations
-
-- Missing values are concentrated in contextual fields: {missing_text}.
-- All 2023 records are missing `distance`, `location_sandag`, and `reservation_sandag`.
-- Case ID `6820212021` appears {database_results['duplicate_case_rows']} times, but the records are not exact duplicates.
-- Normalized severity counts are: {severity_text}.
-- Validation found no invalid dates, non-null times, coordinates, injury totals, or unexpected severity categories.
-
-## Cleanup decisions
-
-- Blank strings and literal `NULL` values became database nulls; rows with missing values were not dropped or imputed.
-- Valid category text such as `None` and `Not Stated` was preserved.
-- Numeric, boolean, date, and time fields were converted to explicit types; invalid non-null values cause the pipeline to fail.
-- `PDO` was normalized to `Property Damage Only` in a new `severity_normalized` field while the original severity was retained.
-- Year, month, weekday, and hour were derived from collision dates and times; missing times remain null.
-- Both records with the repeated case ID were retained because a repeated ID does not prove the rows are duplicates.
-- Coordinates, casualty totals, year ranges, schema, and final aggregates are validated before the outputs are accepted.
-- Unusual distance values and other outliers were preserved rather than capped or removed.
-- Parquet and DuckDB outputs are replaced through temporary files, so rerunning ingestion does not append duplicate records.
-
-## Functional files
-
-- `collision_pipeline.py` cleans, validates, and writes the source data to Parquet, DuckDB, and this EDA report.
-- `src/db.py` validates filters, builds parameterized SQL, and opens DuckDB in read-only mode.
-- `src/analytics.py` provides totals, trends, severity, ranked collision types, filter options, and geographic hotspots.
-- `src/mcp_server.py` exposes the shared analytics functions as MCP tools without allowing arbitrary SQL or writes.
-- `src/dashboard.py` renders raw analytics and optionally enables Analytics and Chat pages with the `--chat` flag.
-- `src/chat.py` provides the local Ollama chat page loaded by the dashboard when `--chat` is enabled.
-- `tests/test_collision_pipeline.py` tests cleaning rules, validation, persistence, and repeatable ingestion.
-- `tests/test_backend.py` tests filters, analytics results, edge cases, and MCP tool delegation.
-- `requirements.txt` pins the Python packages required by the pipeline and applications.
-"""
-    report_path = Path(report_path)
-    report_path.parent.mkdir(parents=True, exist_ok=True)
-    report_path.write_text(report, encoding="utf-8")
-
-
-def run_pipeline(csv_path, parquet_path, database_path, report_path):
+def run_pipeline(csv_path, parquet_path, database_path):
     source = read_source(csv_path)
     validate_source_schema(source)
     if len(source) != 239_588:
@@ -496,7 +431,6 @@ def run_pipeline(csv_path, parquet_path, database_path, report_path):
         raise ValueError(f"Unexpected casualty aggregates: {results}")
     if results["duplicate_case_rows"] != 2:
         raise ValueError(f"Duplicated case ID was not retained twice: {results}")
-    write_eda_report(cleaned, results, report_path)
     return results
 
 
@@ -507,9 +441,8 @@ def main():
         "--parquet", default="data/processed/collisions.parquet"
     )
     parser.add_argument("--database", default="data/collisions.duckdb")
-    parser.add_argument("--report", default="eda.md")
     args = parser.parse_args()
-    results = run_pipeline(args.csv, args.parquet, args.database, args.report)
+    results = run_pipeline(args.csv, args.parquet, args.database)
     print(f"Ingested {results['row_count']:,} collision records")
 
 
