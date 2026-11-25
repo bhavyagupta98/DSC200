@@ -11,6 +11,8 @@ GROUPINGS = {
     "severity": ("severity_normalized", "severity"),
     "weather": ("weather_1", "weather"),
     "collision_type": ("type_of_collision", "collision_type"),
+    "hwy": ("state_hwy_ind", "hwy"),
+    "pcf": ("pcf_viol_category", "pcf"),
 }
 
 TEMPORAL_PERIODS = {"year", "month", "weekday", "hour"}
@@ -21,6 +23,7 @@ FILTER_OPTION_COLUMNS = {
     "collision_type": "type_of_collision",
     "weekday": "collision_weekday",
     "location": "location_sandag",
+    "pcf": "pcf_viol_category",
 }
 
 
@@ -65,6 +68,18 @@ def temporal_trends(period, filters=None, db_path=None):
 
 def severity_distribution(filters=None, db_path=None):
     return aggregate_collisions("severity", filters, db_path)
+
+
+def collision_type_distribution(filters=None, limit=5, db_path=None):
+    if isinstance(limit, bool) or not isinstance(limit, int) or limit <= 0:
+        raise ValueError("limit must be a positive integer")
+
+    rows = aggregate_collisions("collision_type", filters, db_path)
+    ranked = sorted(
+        rows,
+        key=lambda row: (-row["collision_count"], row["collision_type"]),
+    )
+    return ranked[:limit]
 
 
 def geographic_hotspots(filters=None, grid_size=0.01, limit=10, db_path=None):

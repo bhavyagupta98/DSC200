@@ -408,80 +408,7 @@ def validate_database(database_path, expected_rows):
         connection.close()
 
 
-def write_quality_report(source, cleaned, database_results, report_path):
-    important_columns = [
-        "collision_time",
-        "distance",
-        "state_route",
-        "postmile",
-        "control_device",
-        "stwd_vehtype_at_fault",
-        "location_sandag",
-        "reservation_sandag",
-    ]
-    missing = cleaned[important_columns].isna().sum()
-    severity = cleaned["severity_normalized"].value_counts()
-    schema_text = "\n".join(
-        f"- `{column}`: `{data_type}`" for column, data_type in DUCKDB_SCHEMA
-    )
-    missing_text = "\n".join(
-        f"- `{column}`: {int(count):,}" for column, count in missing.items()
-    )
-    severity_text = "\n".join(
-        f"- {label}: {int(count):,}" for label, count in severity.items()
-    )
-    report = f"""# Collision Data Quality Report
-
-## Processing results
-
-- Original rows: {len(source):,}
-- Cleaned rows: {len(cleaned):,}
-- Original columns: {len(ORIGINAL_COLUMNS)}
-- Derived columns: {len(DERIVED_COLUMNS)}
-- DuckDB rows: {database_results['row_count']:,}
-- Years: {database_results['year_min']}–{database_results['year_max']}
-- Total killed: {database_results['number_killed']:,}
-- Total injured: {database_results['number_injured']:,}
-
-## Important missing values
-
-{missing_text}
-
-Missing values were retained. All 2023 records have null `distance`,
-`location_sandag`, and `reservation_sandag`, as documented in the specification.
-
-## Duplicate case ID
-
-Case ID `6820212021` has {database_results['duplicate_case_rows']} records. Both were retained.
-No exact duplicate source rows were found.
-
-## Normalized severity
-
-{severity_text}
-
-Only `PDO` was normalized to `Property Damage Only`; the original severity field
-was preserved.
-
-## Validation
-
-- Pre-ingestion test suite for this implementation: 12 passed
-- Invalid dates: 0
-- Invalid non-null times: 0
-- Out-of-range coordinates: 0
-- Injury total mismatches: 0
-- Unexpected severity categories: 0
-- Known distance outliers were preserved without modification.
-
-## DuckDB schema
-
-{schema_text}
-"""
-    report_path = Path(report_path)
-    report_path.parent.mkdir(parents=True, exist_ok=True)
-    report_path.write_text(report, encoding="utf-8")
-
-
-def run_pipeline(csv_path, parquet_path, database_path, report_path):
+def run_pipeline(csv_path, parquet_path, database_path):
     source = read_source(csv_path)
     validate_source_schema(source)
     if len(source) != 239_588:
@@ -504,7 +431,6 @@ def run_pipeline(csv_path, parquet_path, database_path, report_path):
         raise ValueError(f"Unexpected casualty aggregates: {results}")
     if results["duplicate_case_rows"] != 2:
         raise ValueError(f"Duplicated case ID was not retained twice: {results}")
-    write_quality_report(source, cleaned, results, report_path)
     return results
 
 
@@ -515,9 +441,8 @@ def main():
         "--parquet", default="data/processed/collisions.parquet"
     )
     parser.add_argument("--database", default="data/collisions.duckdb")
-    parser.add_argument("--report", default="DATA_QUALITY_REPORT.md")
     args = parser.parse_args()
-    results = run_pipeline(args.csv, args.parquet, args.database, args.report)
+    results = run_pipeline(args.csv, args.parquet, args.database)
     print(f"Ingested {results['row_count']:,} collision records")
 
 
