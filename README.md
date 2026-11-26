@@ -102,6 +102,13 @@ The default CI command installs dependencies and runs the pytest suite only.
 Add `--nfr` to also run the performance and conversational-accuracy evaluations
 and regenerate the reports under `evaluation/`.
 
+### GitHub Actions
+
+Every push and pull request automatically runs the pytest suite on Python 3.11
+in a clean Linux environment. The workflow is defined in
+`.github/workflows/tests.yml`. It intentionally excludes Ollama and the NFR
+evaluations so the required test check stays fast and deterministic.
+
 ### macOS
 
 ```bash
