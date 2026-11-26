@@ -1,143 +1,71 @@
-# SANDAG Collision Data
+# SANDAG Collision Analytics
 
-This project cleans the SANDAG collision CSV and stores the result in a
-persistent DuckDB database. The generated database can be queried directly at
-`data/collisions.duckdb`; application startup does not rebuild it.
+This project cleans SANDAG collision data, stores it in DuckDB, and provides a
+Streamlit dashboard, reusable analytics functions, an MCP server, and an
+optional local-model chat interface. The repository includes the generated
+database at `data/collisions.duckdb`, so normal setup does not require rebuilding
+the data.
 
-Install dependencies:
+## Contents
+
+- [macOS setup](#macos-setup)
+- [Windows setup](#windows-setup)
+- [CI and evaluation](#ci-and-evaluation)
+- [Using the project](#using-the-project)
+- [Rebuilding the data](#rebuilding-the-data)
+- [macOS troubleshooting](#macos-troubleshooting)
+- [Windows troubleshooting](#windows-troubleshooting)
+
+## macOS setup
+
+Run all commands from the repository root, which contains `README.md`.
+
+### 1. Create the environment
 
 ```bash
 python3 -m venv .venv
 .venv/bin/python -m pip install -r requirements.txt
 ```
 
-Run the tests:
+### 2. Run the tests
 
 ```bash
 .venv/bin/python -m pytest
 ```
 
-Run the one-time ingestion:
-
-```bash
-.venv/bin/python collision_pipeline.py
-```
-
-This creates `data/processed/collisions.parquet` and
-`data/collisions.duckdb`. Rerunning the command atomically replaces the table
-instead of appending duplicate records.
-
-## Restore the raw CSV and rebuild
-
-The 155 MB raw CSV is excluded by `.gitignore`. The repository includes the
-same data as `sandag_collisions_full.csv.gz`, compressed to approximately 21 MB.
-From a fresh clone, restore the ignored CSV while keeping the archive:
-
-```bash
-gzip -dk sandag_collisions_full.csv.gz
-```
-
-Then verify and rebuild the generated artifacts:
-
-```bash
-.venv/bin/python -m pytest
-.venv/bin/python collision_pipeline.py
-```
-
-The decompressed source has SHA-256 checksum
-`0ed40cde74182e5e6f11eb98d95fc1e7369d55b4173e9d9fb4dd3f2692b0d975`.
-
-## Inspect the MCP server
-
-From the project root, start MCP Inspector with:
-
-```bash
-npx @modelcontextprotocol/inspector .venv/bin/python -m src.mcp_server
-```
-
-`.venv/bin/python` is the path to the Python interpreter in this project's
-virtual environment. If you use a different environment, replace it with that
-environment's Python path. You can find the active interpreter with:
-
-```bash
-which python
-```
-
-In MCP Inspector's manual STDIO configuration, set the command to your Python
-environment path and provide `-m` and `src.mcp_server` as separate arguments.
-
-## Run the analytics dashboard
-
-The dashboard uses Streamlit and the existing DuckDB database. It does not
-require Ollama, MCP, a GPU, or an API key. From the project root on macOS or
-Linux, run:
+### 3. Start the dashboard
 
 ```bash
 .venv/bin/python -m streamlit run src/dashboard.py
 ```
 
-Streamlit prints a local URL, normally `http://localhost:8501`, and may open it
-automatically in a browser. Stop the dashboard with `Ctrl+C` in the terminal.
+Open `http://localhost:8501` if Streamlit does not open it automatically. The
+dashboard uses the included DuckDB database and does not require Ollama, MCP, a
+GPU, or an API key. Press `Ctrl+C` in the terminal to stop it.
 
-Without `--chat`, the command continues to show only the analytics dashboard
-and does not start Ollama.
+### 4. Enable chat (optional)
 
-## Enable the collision analytics chat page
-
-The chat uses Streamlit, the OpenAI Agents SDK, the existing MCP server, and a
-local Ollama model. It runs as a second page inside the dashboard and does not
-require an OpenAI API key.
-
-Install Ollama and download the quantized 4B model once:
+Install Ollama and the local model once:
 
 ```bash
 brew install ollama
 ollama pull qwen3:4b-q4_K_M
 ```
 
-Then launch the dashboard with the chat page enabled:
+Then start the dashboard with its chat page:
 
 ```bash
 .venv/bin/python -m streamlit run src/dashboard.py -- --chat
 ```
 
-The app starts `ollama serve` when no server is already available, preloads the
-model, and unloads it when the Streamlit process exits normally. If the app
-started Ollama, it also stops that owned server. Closing only the browser tab
-does not stop Streamlit; stop the terminal process with `Ctrl+C` to trigger
-cleanup.
+The application starts `ollama serve` when needed and uses Apple Metal when it
+is available. No OpenAI API key is required.
 
-To use another installed model, set `OLLAMA_MODEL` before launch:
+## Windows setup
 
-```bash
-OLLAMA_MODEL=qwen3:1.7b .venv/bin/python -m streamlit run src/dashboard.py -- --chat
-```
+Use PowerShell and run all commands from the repository root.
 
-Query the existing database:
-
-```python
-import duckdb
-
-connection = duckdb.connect("data/collisions.duckdb", read_only=True)
-rows = connection.execute("SELECT count(*) FROM collisions").fetchone()[0]
-connection.close()
-```
-
-
-
-
-######
-######
-######
-######
-
-## Windows quick start
-
-Use PowerShell and run every command from the cloned project folder—the folder
-that contains `README.md`. The database is already included, so there is no
-need to rebuild or download the data.
-
-### 1. Set up the project (first time only)
+### 1. Create the environment
 
 ```powershell
 py -m venv .venv
@@ -150,168 +78,222 @@ py -m venv .venv
 .venv\Scripts\python.exe -m pytest
 ```
 
-Continue when the command finishes without failures.
-
-### 3. Run the dashboard
+### 3. Start the dashboard
 
 ```powershell
 .venv\Scripts\python.exe -m streamlit run src\dashboard.py
 ```
 
-The dashboard should open in a browser. If it does not, open
-`http://localhost:8501` yourself. Keep PowerShell open while using the
-dashboard, and press `Ctrl+C` there to stop it.
+Open `http://localhost:8501` if necessary. Keep PowerShell open while using the
+dashboard and press `Ctrl+C` to stop it.
 
-The dashboard does not require Ollama, MCP, a GPU, or an API key.
+### 4. Enable chat (optional)
 
-To include the local-model chat as a second page, use:
-
-```powershell
-.venv\Scripts\python.exe -m streamlit run src\dashboard.py -- --chat
-```
-
-### 4. Run queries using the existing analytics functions
-
-The analytics functions read `data\collisions.duckdb` automatically. You do
-not need to open DuckDB, write SQL, or modify any Python files.
-
-#### Open the query console
-
-Keep the dashboard running and open a **second PowerShell window**. In the new
-window, use `cd` to enter the cloned `dsc200` folder. Then run:
-
-```powershell
-.venv\Scripts\python.exe
-```
-
-Python will display a `>>>` prompt. Enter these two lines one at a time. Do not
-type the `>>>` characters.
-
-```python
-from pprint import pprint
-from src import analytics
-```
-
-#### Example 1: totals for the complete dataset
-
-At the `>>>` prompt, enter:
-
-```python
-pprint(analytics.summary_statistics())
-```
-
-Expected result:
-
-```text
-{'total_collisions': 239588,
- 'total_fatalities': 2479,
- 'total_injuries': 181254}
-```
-
-#### Example 2: fatal collisions in 2020
-
-Enter these two lines one at a time:
-
-```python
-filters = {"start_year": 2020, "end_year": 2020, "severity": "Fatal"}
-pprint(analytics.summary_statistics(filters))
-```
-
-Expected result:
-
-```text
-{'total_collisions': 262,
- 'total_fatalities': 285,
- 'total_injuries': 166}
-```
-
-To ask a different question, change the values in `filters`. For example, this
-returns alcohol-related totals for 2022:
-
-```python
-filters = {"start_year": 2022, "end_year": 2022, "alcohol_involved": True}
-pprint(analytics.summary_statistics(filters))
-```
-
-Expected result:
-
-```text
-{'total_collisions': 3393,
- 'total_fatalities': 67,
- 'total_injuries': 2371}
-```
-
-#### Other queries you can run
-
-Copy one command at a time into the same Python console:
-
-```python
-# Show the valid severity, weather, collision type, weekday, and location values
-pprint(analytics.filter_options())
-
-# Show yearly collision totals from 2020 through 2023
-pprint(analytics.temporal_trends("year", {"start_year": 2020, "end_year": 2023}))
-
-# Show the severity breakdown for 2023
-pprint(analytics.severity_distribution({"start_year": 2023, "end_year": 2023}))
-
-# Show the five most common collision types for 2023
-pprint(analytics.collision_type_distribution(
-    {"start_year": 2023, "end_year": 2023}, limit=5
-))
-
-# Show the ten busiest geographic grid areas for 2023
-pprint(analytics.geographic_hotspots({"start_year": 2023, "end_year": 2023}, limit=10))
-
-# Group 2023 collisions by weather
-pprint(analytics.aggregate_collisions("weather", {"start_year": 2023, "end_year": 2023}))
-```
-
-You can use the following names inside `filters`:
-
-- Year range: `start_year`, `end_year` (2014 through 2023)
-- Date range: `start_date`, `end_date` in `YYYY-MM-DD` format
-- Categories: `severity`, `weather`, `collision_type`, `weekday`, `location`
-- Yes/no filters: `pedestrian_accident`, `bicycle_accident`,
-  `motorcycle_accident`, `truck_accident`, `alcohol_involved`
-- Map area: `min_latitude`, `max_latitude`, `min_longitude`, `max_longitude`
-
-Use `analytics.filter_options()` to find the exact spelling of category
-values. Use `True` or `False` with a capital first letter for yes/no filters.
-Multiple filters can be placed between the same `{}` braces and separated by
-commas, as shown in the examples above.
-
-When finished, close the Python query console with:
-
-```python
-exit()
-```
-
-### 5. Run MCP (optional)
-
-Install Node.js first if you want to use MCP Inspector. Then run:
-
-```powershell
-npx @modelcontextprotocol/inspector .venv\Scripts\python.exe -m src.mcp_server
-```
-
-MCP uses the included database and does not require Ollama or an API key.
-
-Always use `-m src.mcp_server`. Do not run `python src\mcp_server.py`; that can
-cause `ModuleNotFoundError: No module named 'src'`.
-
-### Optional chat page
-
-The chat requires Ollama for Windows and the local model:
+Install Ollama for Windows, then run:
 
 ```powershell
 ollama pull qwen3:4b-q4_K_M
 .venv\Scripts\python.exe -m streamlit run src\dashboard.py -- --chat
 ```
 
-### Windows troubleshooting
+## CI and evaluation
 
-First, confirm that PowerShell is in the correct folder:
+The default CI command installs dependencies and runs the pytest suite only.
+Add `--nfr` to also run the performance and conversational-accuracy evaluations
+and regenerate the reports under `evaluation/`.
+
+### GitHub Actions
+
+Every push and pull request automatically runs the pytest suite on Python 3.11
+in a clean Linux environment. The workflow is defined in
+`.github/workflows/tests.yml`. It intentionally excludes Ollama and the NFR
+evaluations so the required test check stays fast and deterministic.
+
+### macOS
+
+```bash
+# Tests only
+./mac_ci.sh
+
+# Tests and all NFR evaluations
+./mac_ci.sh --nfr
+```
+
+### Google Colab
+
+Select a GPU runtime for faster local-model evaluation, then run:
+
+```python
+!git clone --branch main --single-branch https://github.com/bhavyagupta98/DSC200.git /content/DSC200
+%cd /content/DSC200
+
+# Tests only
+!bash colab_ci.sh
+
+# Tests and all NFR evaluations
+!bash colab_ci.sh --nfr
+```
+
+The NFR run:
+
+- generates filter-latency reports across DuckDB data scales;
+- compares direct backend and MCP latency;
+- evaluates single-turn conversational accuracy;
+- writes the model interaction audit trail to `evaluation/agent.log`; and
+- validates that every expected report and plot was generated.
+
+The model-backed evaluations use `qwen3:4b-q4_K_M` and may take several
+minutes. The runner reports whether Ollama is using CPU or GPU and rejects a
+silent CPU fallback when an NVIDIA GPU is available. Conversational accuracy
+uses one independent run for each of 12 prompts, so its result can vary between
+executions.
+
+Windows does not have a dedicated CI wrapper. Run the PowerShell pytest command
+from [Windows setup](#windows-setup), or use the Colab workflow for the complete
+NFR evaluation.
+
+## Using the project
+
+### Query the analytics functions
+
+Start a Python console with the virtual-environment interpreter:
+
+```bash
+# macOS
+.venv/bin/python
+```
+
+```powershell
+# Windows PowerShell
+.venv\Scripts\python.exe
+```
+
+Example queries:
+
+```python
+from pprint import pprint
+from src import analytics
+
+pprint(analytics.summary_statistics())
+pprint(analytics.summary_statistics({
+    "start_year": 2020,
+    "end_year": 2020,
+    "severity": "Fatal",
+}))
+pprint(analytics.temporal_trends(
+    "year", {"start_year": 2020, "end_year": 2023}
+))
+pprint(analytics.collision_type_distribution(
+    {"start_year": 2023, "end_year": 2023}, limit=5
+))
+```
+
+Supported filters are:
+
+- years: `start_year`, `end_year` (2014 through 2023);
+- dates: `start_date`, `end_date` in `YYYY-MM-DD` format;
+- categories: `severity`, `weather`, `collision_type`, `weekday`, `location`;
+- flags: `pedestrian_accident`, `bicycle_accident`, `motorcycle_accident`,
+  `truck_accident`, `alcohol_involved`; and
+- map bounds: `min_latitude`, `max_latitude`, `min_longitude`,
+  `max_longitude`.
+
+Run `analytics.filter_options()` to see valid category values.
+
+### Inspect the MCP server
+
+Install Node.js if needed, then start MCP Inspector from the repository root.
+
+macOS:
+
+```bash
+npx @modelcontextprotocol/inspector .venv/bin/python -m src.mcp_server
+```
+
+Windows PowerShell:
+
+```powershell
+npx @modelcontextprotocol/inspector .venv\Scripts\python.exe -m src.mcp_server
+```
+
+Use `-m src.mcp_server`; running `python src/mcp_server.py` directly can break
+package imports. The MCP server uses the included database and does not require
+Ollama or an API key.
+
+### Query DuckDB directly
+
+```python
+import duckdb
+
+connection = duckdb.connect("data/collisions.duckdb", read_only=True)
+row_count = connection.execute(
+    "SELECT count(*) FROM collisions"
+).fetchone()[0]
+connection.close()
+```
+
+## Rebuilding the data
+
+Rebuilding is optional because the processed Parquet file and DuckDB database
+are included. The 155 MB source CSV is excluded from Git; its compressed copy,
+`sandag_collisions_full.csv.gz`, is included.
+
+Restore the CSV:
+
+```bash
+gzip -dk sandag_collisions_full.csv.gz
+```
+
+On Windows, use an archive tool that supports gzip and keep the original `.gz`
+file. Then run the pipeline:
+
+```bash
+# macOS
+.venv/bin/python collision_pipeline.py
+```
+
+```powershell
+# Windows PowerShell
+.venv\Scripts\python.exe collision_pipeline.py
+```
+
+The pipeline atomically replaces `data/processed/collisions.parquet` and
+`data/collisions.duckdb`; repeated runs do not append duplicates. The restored
+CSV has SHA-256 checksum
+`0ed40cde74182e5e6f11eb98d95fc1e7369d55b4173e9d9fb4dd3f2692b0d975`.
+
+## macOS troubleshooting
+
+Confirm that the terminal is in the repository root and the environment works:
+
+```bash
+pwd
+test -f README.md && echo "Repository root OK"
+test -f data/collisions.duckdb && echo "Database found"
+.venv/bin/python --version
+.venv/bin/python -c "import duckdb, streamlit; print('Dependencies OK')"
+```
+
+If the virtual-environment interpreter is missing, repeat macOS setup step 1.
+If port 8501 is busy, use another port:
+
+```bash
+.venv/bin/python -m streamlit run src/dashboard.py --server.port 8502
+```
+
+For chat problems, verify that Ollama and the model are available:
+
+```bash
+ollama --version
+ollama list
+curl http://127.0.0.1:11434/api/version
+```
+
+The NFR runner writes Ollama startup details to `evaluation/ollama-ci.log`.
+
+## Windows troubleshooting
+
+Confirm that PowerShell is in the repository root:
 
 ```powershell
 Get-Location
@@ -320,10 +302,8 @@ Test-Path .\src\dashboard.py
 Test-Path .\data\collisions.duckdb
 ```
 
-All three `Test-Path` commands should return `True`. If they do not, use `cd`
-to enter the cloned project folder and try again.
-
-Confirm that Python and the virtual environment work:
+All three `Test-Path` commands should return `True`. Confirm Python and the
+dependencies:
 
 ```powershell
 py --version
@@ -331,13 +311,12 @@ py --version
 .venv\Scripts\python.exe -c "import duckdb, streamlit; print('Dependencies OK')"
 ```
 
-If `.venv\Scripts\python.exe` is missing, repeat step 1. If a package import
-fails, repeat the `pip install` command from step 1.
-
-If port 8501 is already being used, start the dashboard on another port:
+If the virtual-environment interpreter is missing or an import fails, repeat
+Windows setup step 1. If port 8501 is busy, use:
 
 ```powershell
 .venv\Scripts\python.exe -m streamlit run src\dashboard.py --server.port 8502
 ```
 
-Then open `http://localhost:8502`.
+Then open `http://localhost:8502`. For chat problems, confirm that Ollama is
+running and that `qwen3:4b-q4_K_M` appears in `ollama list`.

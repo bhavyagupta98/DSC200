@@ -1,3 +1,4 @@
+import os
 from datetime import date, datetime
 from math import isfinite
 from pathlib import Path
@@ -5,7 +6,12 @@ from pathlib import Path
 import duckdb
 
 
-DEFAULT_DATABASE_PATH = Path(__file__).resolve().parents[1] / "data" / "collisions.duckdb"
+PROJECT_DATABASE_PATH = (
+    Path(__file__).resolve().parents[1] / "data" / "collisions.duckdb"
+)
+DEFAULT_DATABASE_PATH = Path(
+    os.environ.get("COLLISIONS_DB_PATH") or PROJECT_DATABASE_PATH
+)
 
 CATEGORICAL_FILTERS = {
     "severity": "severity_normalized",
