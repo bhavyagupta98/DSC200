@@ -41,8 +41,10 @@ require_file "evaluation/benchmark_conversational_accuracy.py"
 
 step "Preparing the Python environment"
 if [[ "${PROJECT_ROOT}" == /content/* ]]; then
-    RUNNER_PYTHON="$(command -v "${PYTHON_BIN}")"
-    printf 'Using the isolated Colab runtime: %s\n' "${RUNNER_PYTHON}"
+    "${PYTHON_BIN}" -m pip install --quiet virtualenv
+    "${PYTHON_BIN}" -m virtualenv --clear "${VENV_PATH}"
+    RUNNER_PYTHON="${VENV_PATH}/bin/python"
+    printf 'Created the project environment: %s\n' "${VENV_PATH}"
 else
     if [[ ! -x "${VENV_PATH}/bin/python" ]]; then
         "${PYTHON_BIN}" -m venv "${VENV_PATH}"
@@ -54,6 +56,14 @@ fi
 
 step "Installing Ollama when needed"
 if ! command -v ollama >/dev/null 2>&1; then
+    if ! command -v zstd >/dev/null 2>&1; then
+        if ! command -v apt-get >/dev/null 2>&1; then
+            printf 'Ollama requires zstd, and apt-get is unavailable.\n' >&2
+            exit 1
+        fi
+        apt-get update -qq
+        apt-get install -y -qq zstd
+    fi
     OLLAMA_INSTALLER="$(mktemp)"
     curl -fsSL https://ollama.com/install.sh -o "${OLLAMA_INSTALLER}"
     sh "${OLLAMA_INSTALLER}"
