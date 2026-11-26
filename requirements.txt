@@ -1,4 +1,5 @@
 duckdb==1.4.2
+matplotlib==3.10.7
 mcp[cli]==1.30.0
 openai-agents==0.24.0
 pandas==2.3.3

@@ -222,3 +222,6 @@ __marimo__/
 # Project data
 sandag_collisions_full.csv
 !sandag_collisions_full.csv.gz
+
+# Generated latency benchmark artifacts
+evaluation/snapshots/
