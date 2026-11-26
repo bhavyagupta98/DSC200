@@ -17,6 +17,24 @@ Run the tests:
 .venv/bin/python -m pytest
 ```
 
+## Reproduce tests and evaluation reports in Google Colab
+
+Use a GPU Colab runtime for substantially faster local-model evaluation. Run
+this in one Colab cell, replacing the branch if needed:
+
+```python
+!git clone --branch main --single-branch https://github.com/bhavyagupta98/DSC200.git /content/DSC200
+%cd /content/DSC200
+!bash colab_ci.sh
+```
+
+The runner creates an isolated Python environment, installs the pinned
+dependencies and Ollama, downloads `qwen3:4b-q4_K_M`, runs the test suite, and
+regenerates every evaluation report, plot, and `evaluation/agent.log`. It exits
+with a nonzero status if any stage or expected artifact fails. The two
+model-backed evaluations can take several minutes, especially on a CPU-only
+runtime.
+
 Run the one-time ingestion:
 
 ```bash
