@@ -226,3 +226,4 @@ sandag_collisions_full.csv
 
 # Generated latency benchmark artifacts
 evaluation/snapshots/
+.ollama-runtime/

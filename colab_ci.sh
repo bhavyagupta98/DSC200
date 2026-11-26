@@ -1,12 +1,14 @@
 #!/usr/bin/env bash
 
 set -Eeuo pipefail
+export PYTHONUNBUFFERED=1
 
 PROJECT_ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 PYTHON_BIN="${PYTHON_BIN:-python3}"
 OLLAMA_MODEL_NAME="${OLLAMA_MODEL:-qwen3:4b-q4_K_M}"
 VENV_PATH="${VENV_PATH:-${PROJECT_ROOT}/.venv}"
 OLLAMA_LOG_PATH="${PROJECT_ROOT}/evaluation/ollama-ci.log"
+OLLAMA_RUNTIME_PATH="${PROJECT_ROOT}/.ollama-runtime"
 OLLAMA_SERVER_PID=""
 RUNNER_PYTHON=""
 
@@ -17,6 +19,14 @@ cleanup() {
     fi
 }
 trap cleanup EXIT
+
+report_failure() {
+    local exit_code="$?"
+    printf '\nERROR: colab_ci.sh failed at line %s with exit code %s.\n' \
+        "${BASH_LINENO[0]}" "${exit_code}" >&2
+    exit "${exit_code}"
+}
+trap report_failure ERR
 
 step() {
     printf '\n==> %s\n' "$1"
@@ -64,10 +74,29 @@ if ! command -v ollama >/dev/null 2>&1; then
         apt-get update -qq
         apt-get install -y -qq zstd
     fi
-    OLLAMA_INSTALLER="$(mktemp)"
-    curl -fsSL https://ollama.com/install.sh -o "${OLLAMA_INSTALLER}"
-    sh "${OLLAMA_INSTALLER}"
-    rm -f "${OLLAMA_INSTALLER}"
+    if [[ "${PROJECT_ROOT}" == /content/* ]]; then
+        if [[ "$(uname -m)" != "x86_64" ]]; then
+            printf 'The Colab runner expects an x86_64 runtime.\n' >&2
+            exit 1
+        fi
+        OLLAMA_ARCHIVE="$(mktemp --suffix=.tar.zst)"
+        mkdir -p "${OLLAMA_RUNTIME_PATH}"
+        curl -fL --progress-bar \
+            https://ollama.com/download/ollama-linux-amd64.tar.zst \
+            -o "${OLLAMA_ARCHIVE}"
+        tar --zstd -xf "${OLLAMA_ARCHIVE}" -C "${OLLAMA_RUNTIME_PATH}"
+        rm -f "${OLLAMA_ARCHIVE}"
+        export PATH="${OLLAMA_RUNTIME_PATH}/bin:${PATH}"
+    else
+        OLLAMA_INSTALLER="$(mktemp)"
+        curl -fsSL https://ollama.com/install.sh -o "${OLLAMA_INSTALLER}"
+        sh "${OLLAMA_INSTALLER}"
+        rm -f "${OLLAMA_INSTALLER}"
+    fi
+fi
+if ! command -v ollama >/dev/null 2>&1; then
+    printf 'Ollama installation completed without an executable on PATH.\n' >&2
+    exit 1
 fi
 
 step "Starting Ollama"
@@ -97,7 +126,8 @@ export MPLCONFIGDIR="${PROJECT_ROOT}/.cache/matplotlib"
 mkdir -p "${MPLCONFIGDIR}"
 
 step "Running the test suite"
-"${RUNNER_PYTHON}" -m pytest -q
+"${RUNNER_PYTHON}" -m pytest tests -vv --maxfail=1
+printf 'Test suite completed successfully.\n'
 
 step "Generating filter-scaling latency artifacts"
 "${RUNNER_PYTHON}" evaluation/benchmark_filter_latency.py \

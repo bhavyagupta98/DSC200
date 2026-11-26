@@ -30,10 +30,11 @@ this in one Colab cell, replacing the branch if needed:
 
 The runner creates an isolated project environment using `virtualenv` on Colab
 (or standard `venv` elsewhere), installs the pinned dependencies, `zstd`, and
-Ollama, downloads `qwen3:4b-q4_K_M`, runs the test suite, and regenerates every
-evaluation report, plot, and `evaluation/agent.log`. It exits with a nonzero
-status if any stage or expected artifact fails. The two model-backed
-evaluations can take several minutes, especially on a CPU-only runtime.
+Ollama without requiring `sudo`, downloads `qwen3:4b-q4_K_M`, runs the test
+suite, and regenerates every evaluation report, plot, and
+`evaluation/agent.log`. It exits with a nonzero status if any stage or expected
+artifact fails. The two model-backed evaluations can take several minutes,
+especially on a CPU-only runtime.
 
 Run the one-time ingestion:
 
