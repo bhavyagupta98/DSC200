@@ -11,9 +11,15 @@ VENV_PATH="${VENV_PATH:-${PROJECT_ROOT}/.venv}"
 OLLAMA_LOG_PATH="${PROJECT_ROOT}/evaluation/ollama-ci.log"
 OLLAMA_RUNTIME_PATH="${PROJECT_ROOT}/.ollama-runtime"
 OLLAMA_SERVER_PID=""
+ACTIVE_COMMAND_PID=""
 RUNNER_PYTHON=""
 
 cleanup() {
+    if [[ -n "${ACTIVE_COMMAND_PID}" ]] && \
+        kill -0 "${ACTIVE_COMMAND_PID}" 2>/dev/null; then
+        kill "${ACTIVE_COMMAND_PID}"
+        wait "${ACTIVE_COMMAND_PID}" 2>/dev/null || true
+    fi
     if [[ -n "${OLLAMA_SERVER_PID}" ]] && kill -0 "${OLLAMA_SERVER_PID}" 2>/dev/null; then
         kill "${OLLAMA_SERVER_PID}"
         wait "${OLLAMA_SERVER_PID}" 2>/dev/null || true
@@ -31,6 +37,31 @@ trap report_failure ERR
 
 step() {
     printf '\n==> %s\n' "$1"
+}
+
+run_with_progress() {
+    local label="$1"
+    local elapsed_seconds=0
+    local command_status=0
+    shift
+
+    "$@" &
+    ACTIVE_COMMAND_PID="$!"
+    while kill -0 "${ACTIVE_COMMAND_PID}" 2>/dev/null; do
+        sleep 1
+        elapsed_seconds=$((elapsed_seconds + 1))
+        if (( elapsed_seconds % 30 == 0 )); then
+            printf '    %s still running (%ss elapsed)\n' \
+                "${label}" "${elapsed_seconds}"
+        fi
+    done
+    if wait "${ACTIVE_COMMAND_PID}"; then
+        command_status=0
+    else
+        command_status="$?"
+    fi
+    ACTIVE_COMMAND_PID=""
+    return "${command_status}"
 }
 
 require_file() {
@@ -82,8 +113,9 @@ fi
 printf 'Test suite completed successfully.\n'
 
 step "Generating filter-scaling latency artifacts"
-"${RUNNER_PYTHON}" evaluation/benchmark_filter_latency.py \
-    --rebuild-snapshots
+run_with_progress "Filter-scaling benchmark" \
+    "${RUNNER_PYTHON}" -u evaluation/benchmark_filter_latency.py \
+        --rebuild-snapshots
 
 step "Installing Ollama when needed"
 if [[ -x "${OLLAMA_RUNTIME_PATH}/bin/ollama" ]]; then
@@ -147,10 +179,12 @@ step "Downloading ${OLLAMA_MODEL_NAME}"
 ollama pull "${OLLAMA_MODEL_NAME}"
 
 step "Generating MCP and end-to-end agent latency artifacts"
-"${RUNNER_PYTHON}" evaluation/benchmark_mcp_latency.py
+run_with_progress "MCP latency benchmark" \
+    "${RUNNER_PYTHON}" -u evaluation/benchmark_mcp_latency.py
 
 step "Generating conversational accuracy artifacts"
-"${RUNNER_PYTHON}" evaluation/benchmark_conversational_accuracy.py
+run_with_progress "Conversational accuracy evaluation" \
+    "${RUNNER_PYTHON}" -u evaluation/benchmark_conversational_accuracy.py
 
 step "Validating generated artifacts"
 GENERATED_ARTIFACTS=(
