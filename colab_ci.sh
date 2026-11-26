@@ -50,7 +50,7 @@ require_file "evaluation/benchmark_mcp_latency.py"
 require_file "evaluation/benchmark_conversational_accuracy.py"
 
 step "Preparing the Python environment"
-if [[ "${PROJECT_ROOT}" == /content/* ]]; then
+if [[ "$(uname -s)" == "Linux" ]]; then
     "${PYTHON_BIN}" -m pip install --quiet virtualenv
     "${PYTHON_BIN}" -m virtualenv --clear "${VENV_PATH}"
     RUNNER_PYTHON="${VENV_PATH}/bin/python"
@@ -74,7 +74,7 @@ if ! command -v ollama >/dev/null 2>&1; then
         apt-get update -qq
         apt-get install -y -qq zstd
     fi
-    if [[ "${PROJECT_ROOT}" == /content/* ]]; then
+    if [[ "$(uname -s)" == "Linux" ]]; then
         if [[ "$(uname -m)" != "x86_64" ]]; then
             printf 'The Colab runner expects an x86_64 runtime.\n' >&2
             exit 1
