@@ -8,6 +8,7 @@ export PYTEST_DISABLE_PLUGIN_AUTOLOAD=1
 PROJECT_ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 PYTHON_BIN="${PYTHON_BIN:-python3}"
 OLLAMA_MODEL_NAME="${OLLAMA_MODEL:-qwen3:4b-q4_K_M}"
+RUNNER_LABEL="${RUNNER_LABEL:-Colab CI}"
 VENV_PATH="${VENV_PATH:-${PROJECT_ROOT}/.venv}"
 OLLAMA_LOG_PATH="${PROJECT_ROOT}/evaluation/ollama-ci.log"
 OLLAMA_RUNTIME_PATH="${PROJECT_ROOT}/.ollama-runtime"
@@ -252,4 +253,4 @@ for artifact in "${GENERATED_ARTIFACTS[@]}"; do
     printf '  %s\n' "${artifact}"
 done
 
-printf '\nColab CI completed successfully.\n'
+printf '\n%s completed successfully.\n' "${RUNNER_LABEL}"

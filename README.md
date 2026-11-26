@@ -38,6 +38,20 @@ especially on a CPU-only runtime. When an NVIDIA GPU is visible, the runner
 exposes it to Ollama and verifies nonzero model VRAM usage before starting the
 model-backed evaluations; it fails early if Ollama silently falls back to CPU.
 
+## Reproduce tests and evaluation reports on macOS
+
+The macOS runner executes the same tests, benchmarks, artifact checks, and GPU
+verification as the Colab runner while using the local Ollama installation and
+Apple accelerator when available:
+
+```bash
+./mac_ci.sh
+```
+
+Both runners create the same files under `evaluation/`. Conversational accuracy
+uses one independent run for each of the 12 prompts; model-generated answers and
+accuracy can still vary between executions.
+
 Run the one-time ingestion:
 
 ```bash

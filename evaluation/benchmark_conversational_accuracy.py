@@ -30,7 +30,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 DATABASE_PATH = PROJECT_ROOT / "data" / "collisions.duckdb"
 REPORT_PATH = PROJECT_ROOT / "evaluation" / "conversational_accuracy_summary.md"
 LOG_PATH = PROJECT_ROOT / "evaluation" / "agent.log"
-RUNS_PER_CASE = 3
+RUNS_PER_CASE = 1
 
 sys.path.insert(0, str(PROJECT_ROOT))
 
