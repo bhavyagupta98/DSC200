@@ -8,6 +8,7 @@ OLLAMA_MODEL_NAME="${OLLAMA_MODEL:-qwen3:4b-q4_K_M}"
 VENV_PATH="${VENV_PATH:-${PROJECT_ROOT}/.venv}"
 OLLAMA_LOG_PATH="${PROJECT_ROOT}/evaluation/ollama-ci.log"
 OLLAMA_SERVER_PID=""
+RUNNER_PYTHON=""
 
 cleanup() {
     if [[ -n "${OLLAMA_SERVER_PID}" ]] && kill -0 "${OLLAMA_SERVER_PID}" 2>/dev/null; then
@@ -38,12 +39,18 @@ require_file "evaluation/benchmark_filter_latency.py"
 require_file "evaluation/benchmark_mcp_latency.py"
 require_file "evaluation/benchmark_conversational_accuracy.py"
 
-step "Creating the Python environment"
-if [[ ! -x "${VENV_PATH}/bin/python" ]]; then
-    "${PYTHON_BIN}" -m venv "${VENV_PATH}"
+step "Preparing the Python environment"
+if [[ "${PROJECT_ROOT}" == /content/* ]]; then
+    RUNNER_PYTHON="$(command -v "${PYTHON_BIN}")"
+    printf 'Using the isolated Colab runtime: %s\n' "${RUNNER_PYTHON}"
+else
+    if [[ ! -x "${VENV_PATH}/bin/python" ]]; then
+        "${PYTHON_BIN}" -m venv "${VENV_PATH}"
+    fi
+    RUNNER_PYTHON="${VENV_PATH}/bin/python"
 fi
-"${VENV_PATH}/bin/python" -m pip install --upgrade pip
-"${VENV_PATH}/bin/python" -m pip install -r requirements.txt
+"${RUNNER_PYTHON}" -m pip install --upgrade pip
+"${RUNNER_PYTHON}" -m pip install -r requirements.txt
 
 step "Installing Ollama when needed"
 if ! command -v ollama >/dev/null 2>&1; then
@@ -80,17 +87,17 @@ export MPLCONFIGDIR="${PROJECT_ROOT}/.cache/matplotlib"
 mkdir -p "${MPLCONFIGDIR}"
 
 step "Running the test suite"
-"${VENV_PATH}/bin/python" -m pytest -q
+"${RUNNER_PYTHON}" -m pytest -q
 
 step "Generating filter-scaling latency artifacts"
-"${VENV_PATH}/bin/python" evaluation/benchmark_filter_latency.py \
+"${RUNNER_PYTHON}" evaluation/benchmark_filter_latency.py \
     --rebuild-snapshots
 
 step "Generating MCP and end-to-end agent latency artifacts"
-"${VENV_PATH}/bin/python" evaluation/benchmark_mcp_latency.py
+"${RUNNER_PYTHON}" evaluation/benchmark_mcp_latency.py
 
 step "Generating conversational accuracy artifacts"
-"${VENV_PATH}/bin/python" evaluation/benchmark_conversational_accuracy.py
+"${RUNNER_PYTHON}" evaluation/benchmark_conversational_accuracy.py
 
 step "Validating generated artifacts"
 GENERATED_ARTIFACTS=(

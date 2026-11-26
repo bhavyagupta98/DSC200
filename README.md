@@ -28,12 +28,12 @@ this in one Colab cell, replacing the branch if needed:
 !bash colab_ci.sh
 ```
 
-The runner creates an isolated Python environment, installs the pinned
-dependencies and Ollama, downloads `qwen3:4b-q4_K_M`, runs the test suite, and
-regenerates every evaluation report, plot, and `evaluation/agent.log`. It exits
-with a nonzero status if any stage or expected artifact fails. The two
-model-backed evaluations can take several minutes, especially on a CPU-only
-runtime.
+The runner uses Colab's ephemeral Python environment (and creates `.venv` when
+run outside Colab), installs the pinned dependencies and Ollama, downloads
+`qwen3:4b-q4_K_M`, runs the test suite, and regenerates every evaluation report,
+plot, and `evaluation/agent.log`. It exits with a nonzero status if any stage or
+expected artifact fails. The two model-backed evaluations can take several
+minutes, especially on a CPU-only runtime.
 
 Run the one-time ingestion:
 
