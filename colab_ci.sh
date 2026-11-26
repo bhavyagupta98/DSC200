@@ -2,6 +2,7 @@
 
 set -Eeuo pipefail
 export PYTHONUNBUFFERED=1
+export MPLBACKEND=Agg
 
 PROJECT_ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 PYTHON_BIN="${PYTHON_BIN:-python3}"
@@ -51,10 +52,13 @@ require_file "evaluation/benchmark_conversational_accuracy.py"
 
 step "Preparing the Python environment"
 if [[ "$(uname -s)" == "Linux" ]]; then
-    "${PYTHON_BIN}" -m pip install --quiet virtualenv
-    "${PYTHON_BIN}" -m virtualenv --clear "${VENV_PATH}"
+    if [[ ! -x "${VENV_PATH}/bin/python" ]] || \
+        ! "${VENV_PATH}/bin/python" -m pip --version >/dev/null 2>&1; then
+        "${PYTHON_BIN}" -m pip install --quiet virtualenv
+        "${PYTHON_BIN}" -m virtualenv --clear "${VENV_PATH}"
+    fi
     RUNNER_PYTHON="${VENV_PATH}/bin/python"
-    printf 'Created the project environment: %s\n' "${VENV_PATH}"
+    printf 'Using the project environment: %s\n' "${VENV_PATH}"
 else
     if [[ ! -x "${VENV_PATH}/bin/python" ]]; then
         "${PYTHON_BIN}" -m venv "${VENV_PATH}"
@@ -65,6 +69,9 @@ fi
 "${RUNNER_PYTHON}" -m pip install -r requirements.txt
 
 step "Installing Ollama when needed"
+if [[ -x "${OLLAMA_RUNTIME_PATH}/bin/ollama" ]]; then
+    export PATH="${OLLAMA_RUNTIME_PATH}/bin:${PATH}"
+fi
 if ! command -v ollama >/dev/null 2>&1; then
     if ! command -v zstd >/dev/null 2>&1; then
         if ! command -v apt-get >/dev/null 2>&1; then
