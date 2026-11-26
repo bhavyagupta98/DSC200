@@ -68,6 +68,23 @@ fi
 "${RUNNER_PYTHON}" -m pip install --upgrade pip
 "${RUNNER_PYTHON}" -m pip install -r requirements.txt
 
+export OLLAMA_MODEL="${OLLAMA_MODEL_NAME}"
+export MPLCONFIGDIR="${PROJECT_ROOT}/.cache/matplotlib"
+mkdir -p "${MPLCONFIGDIR}"
+
+step "Running the test suite"
+if command -v timeout >/dev/null 2>&1; then
+    timeout --foreground 300 \
+        "${RUNNER_PYTHON}" -m pytest tests -vv --maxfail=1
+else
+    "${RUNNER_PYTHON}" -m pytest tests -vv --maxfail=1
+fi
+printf 'Test suite completed successfully.\n'
+
+step "Generating filter-scaling latency artifacts"
+"${RUNNER_PYTHON}" evaluation/benchmark_filter_latency.py \
+    --rebuild-snapshots
+
 step "Installing Ollama when needed"
 if [[ -x "${OLLAMA_RUNTIME_PATH}/bin/ollama" ]]; then
     export PATH="${OLLAMA_RUNTIME_PATH}/bin:${PATH}"
@@ -128,17 +145,6 @@ fi
 
 step "Downloading ${OLLAMA_MODEL_NAME}"
 ollama pull "${OLLAMA_MODEL_NAME}"
-export OLLAMA_MODEL="${OLLAMA_MODEL_NAME}"
-export MPLCONFIGDIR="${PROJECT_ROOT}/.cache/matplotlib"
-mkdir -p "${MPLCONFIGDIR}"
-
-step "Running the test suite"
-"${RUNNER_PYTHON}" -m pytest tests -vv --maxfail=1
-printf 'Test suite completed successfully.\n'
-
-step "Generating filter-scaling latency artifacts"
-"${RUNNER_PYTHON}" evaluation/benchmark_filter_latency.py \
-    --rebuild-snapshots
 
 step "Generating MCP and end-to-end agent latency artifacts"
 "${RUNNER_PYTHON}" evaluation/benchmark_mcp_latency.py
