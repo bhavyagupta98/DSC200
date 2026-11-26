@@ -802,9 +802,9 @@ def write_report(rows):
         )
         output.write(
             "The production model sampling configuration is unchanged. Results "
-            "can vary between runs because model generation is nondeterministic; "
-            "three independent runs per prompt expose that variability instead "
-            "of presenting a seeded evaluation as production behavior.\n"
+            "can vary between executions because model generation is "
+            "nondeterministic; this evaluation reports one independent run per "
+            "prompt and does not present seeded behavior as production behavior.\n"
         )
     os.replace(temporary_path, REPORT_PATH)
 

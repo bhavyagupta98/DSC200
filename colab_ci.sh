@@ -17,6 +17,19 @@ ACTIVE_COMMAND_PID=""
 RUNNER_PYTHON=""
 NVIDIA_GPU_AVAILABLE=0
 NVIDIA_GPU_NAME=""
+RUN_NFR=0
+
+for argument in "$@"; do
+    case "${argument}" in
+        --nfr)
+            RUN_NFR=1
+            ;;
+        *)
+            printf 'Usage: %s [--nfr]\n' "$0" >&2
+            exit 2
+            ;;
+    esac
+done
 
 cleanup() {
     if [[ -n "${ACTIVE_COMMAND_PID}" ]] && \
@@ -79,11 +92,13 @@ cd "${PROJECT_ROOT}"
 
 step "Validating repository inputs"
 require_file "requirements.txt"
-require_file "data/collisions.duckdb"
-require_file "data/processed/collisions.parquet"
-require_file "evaluation/benchmark_filter_latency.py"
-require_file "evaluation/benchmark_mcp_latency.py"
-require_file "evaluation/benchmark_conversational_accuracy.py"
+if [[ "${RUN_NFR}" -eq 1 ]]; then
+    require_file "data/collisions.duckdb"
+    require_file "data/processed/collisions.parquet"
+    require_file "evaluation/benchmark_filter_latency.py"
+    require_file "evaluation/benchmark_mcp_latency.py"
+    require_file "evaluation/benchmark_conversational_accuracy.py"
+fi
 
 step "Preparing the Python environment"
 if [[ "$(uname -s)" == "Linux" ]]; then
@@ -113,6 +128,12 @@ step "Running the test suite"
 "${RUNNER_PYTHON}" -u -m pytest tests -vv -s --maxfail=1 \
     -o faulthandler_timeout=30
 printf 'Test suite completed successfully.\n'
+
+if [[ "${RUN_NFR}" -eq 0 ]]; then
+    printf '\n%s completed successfully (tests only).\n' "${RUNNER_LABEL}"
+    printf 'Run with --nfr to generate the evaluation artifacts.\n'
+    exit 0
+fi
 
 step "Generating filter-scaling latency artifacts"
 run_with_progress "Filter-scaling benchmark" \

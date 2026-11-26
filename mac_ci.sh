@@ -10,4 +10,4 @@ if [[ "$(uname -s)" != "Darwin" ]]; then
 fi
 
 export RUNNER_LABEL="macOS CI"
-exec bash "${PROJECT_ROOT}/colab_ci.sh"
+exec bash "${PROJECT_ROOT}/colab_ci.sh" "$@"
