@@ -3,6 +3,7 @@
 set -Eeuo pipefail
 export PYTHONUNBUFFERED=1
 export MPLBACKEND=Agg
+export PYTEST_DISABLE_PLUGIN_AUTOLOAD=1
 
 PROJECT_ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 PYTHON_BIN="${PYTHON_BIN:-python3}"
@@ -13,6 +14,8 @@ OLLAMA_RUNTIME_PATH="${PROJECT_ROOT}/.ollama-runtime"
 OLLAMA_SERVER_PID=""
 ACTIVE_COMMAND_PID=""
 RUNNER_PYTHON=""
+NVIDIA_GPU_AVAILABLE=0
+NVIDIA_GPU_NAME=""
 
 cleanup() {
     if [[ -n "${ACTIVE_COMMAND_PID}" ]] && \
@@ -104,12 +107,10 @@ export MPLCONFIGDIR="${PROJECT_ROOT}/.cache/matplotlib"
 mkdir -p "${MPLCONFIGDIR}"
 
 step "Running the test suite"
-if command -v timeout >/dev/null 2>&1; then
-    timeout --foreground 300 \
-        "${RUNNER_PYTHON}" -m pytest tests -vv --maxfail=1
-else
-    "${RUNNER_PYTHON}" -m pytest tests -vv --maxfail=1
-fi
+"${RUNNER_PYTHON}" -u -c \
+    'import sys; print(f"Python preflight passed: {sys.executable}", flush=True)'
+"${RUNNER_PYTHON}" -u -m pytest tests -vv -s --maxfail=1 \
+    -o faulthandler_timeout=30
 printf 'Test suite completed successfully.\n'
 
 step "Generating filter-scaling latency artifacts"
@@ -155,6 +156,19 @@ if ! command -v ollama >/dev/null 2>&1; then
     exit 1
 fi
 
+step "Detecting accelerator hardware"
+if command -v nvidia-smi >/dev/null 2>&1 && \
+    nvidia-smi --query-gpu=name --format=csv,noheader >/dev/null 2>&1; then
+    NVIDIA_GPU_AVAILABLE=1
+    NVIDIA_GPU_NAME="$(nvidia-smi --query-gpu=name --format=csv,noheader | sed -n '1p')"
+    export CUDA_VISIBLE_DEVICES="${CUDA_VISIBLE_DEVICES:-0}"
+    printf 'NVIDIA GPU detected: '
+    nvidia-smi --query-gpu=name,memory.total --format=csv,noheader
+    printf 'CUDA_VISIBLE_DEVICES=%s\n' "${CUDA_VISIBLE_DEVICES}"
+else
+    printf 'No NVIDIA GPU detected; Ollama may use CPU or another accelerator.\n'
+fi
+
 step "Starting Ollama"
 if ! curl -fsS http://127.0.0.1:11434/api/version >/dev/null 2>&1; then
     ollama serve >"${OLLAMA_LOG_PATH}" 2>&1 &
@@ -177,6 +191,41 @@ fi
 
 step "Downloading ${OLLAMA_MODEL_NAME}"
 ollama pull "${OLLAMA_MODEL_NAME}"
+
+step "Loading model and verifying accelerator use"
+curl -fsS http://127.0.0.1:11434/api/generate \
+    -H 'Content-Type: application/json' \
+    -d "{\"model\":\"${OLLAMA_MODEL_NAME}\",\"prompt\":\"\",\"keep_alive\":-1}" \
+    >/dev/null
+OLLAMA_PROCESS_INFO="$(curl -fsS http://127.0.0.1:11434/api/ps)"
+LOADED_MODEL_COUNT="$(printf '%s' "${OLLAMA_PROCESS_INFO}" | \
+    "${RUNNER_PYTHON}" -c \
+    'import json, sys; print(len(json.load(sys.stdin).get("models", [])))')"
+MODEL_VRAM_BYTES="$(printf '%s' "${OLLAMA_PROCESS_INFO}" | \
+    "${RUNNER_PYTHON}" -c \
+    'import json, sys; print(sum(m.get("size_vram", 0) for m in json.load(sys.stdin).get("models", [])))')"
+if [[ "${LOADED_MODEL_COUNT}" -eq 0 ]]; then
+    printf 'Ollama did not report a loaded model after preloading.\n' >&2
+    exit 1
+fi
+if [[ "${NVIDIA_GPU_AVAILABLE}" -eq 1 && "${MODEL_VRAM_BYTES}" -eq 0 ]]; then
+    printf 'A NVIDIA GPU is available, but Ollama loaded the model on CPU.\n' >&2
+    printf 'See %s for GPU discovery details.\n' "${OLLAMA_LOG_PATH}" >&2
+    exit 1
+fi
+if [[ "${MODEL_VRAM_BYTES}" -gt 0 ]]; then
+    MODEL_VRAM_GIB="$("${RUNNER_PYTHON}" -c \
+        'import sys; print(f"{int(sys.argv[1]) / 2**30:.2f}")' \
+        "${MODEL_VRAM_BYTES}")"
+    printf '\n*** OLLAMA EXECUTION DEVICE: GPU ***\n'
+    if [[ -n "${NVIDIA_GPU_NAME}" ]]; then
+        printf 'GPU: %s\n' "${NVIDIA_GPU_NAME}"
+    fi
+    printf 'Model VRAM in use: %s GiB\n\n' "${MODEL_VRAM_GIB}"
+else
+    printf '\n*** OLLAMA EXECUTION DEVICE: CPU ***\n'
+    printf 'WARNING: Model evaluations will be slow.\n\n'
+fi
 
 step "Generating MCP and end-to-end agent latency artifacts"
 run_with_progress "MCP latency benchmark" \

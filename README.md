@@ -34,7 +34,9 @@ Ollama without requiring `sudo`, downloads `qwen3:4b-q4_K_M`, runs the test
 suite, and regenerates every evaluation report, plot, and
 `evaluation/agent.log`. It exits with a nonzero status if any stage or expected
 artifact fails. The two model-backed evaluations can take several minutes,
-especially on a CPU-only runtime.
+especially on a CPU-only runtime. When an NVIDIA GPU is visible, the runner
+exposes it to Ollama and verifies nonzero model VRAM usage before starting the
+model-backed evaluations; it fails early if Ollama silently falls back to CPU.
 
 Run the one-time ingestion:
 
